@@ -6,7 +6,6 @@ from sklearn.ensemble import RandomForestClassifier
 from scipy.stats import randint
 
 import os
-import sys
 
 #In case of retreiving a file to import functions (to modify depending on the architecture using os.path.dirname & os.path.join)
 #sys.path.append(os.path.dirname(__file__), '..', 'file_location')
