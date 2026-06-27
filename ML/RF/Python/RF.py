@@ -6,6 +6,7 @@ from sklearn.ensemble import RandomForestClassifier
 from scipy.stats import randint
 
 import os
+from sklearn.datasets import load_iris
 
 #In case of retreiving a file to import functions (to modify depending on the architecture using os.path.dirname & os.path.join)
 #sys.path.append(os.path.dirname(__file__), '..', 'file_location')
@@ -13,21 +14,34 @@ import os
 
 #Retreiving data
 #paths definition
-path = os.path.dirname(__file__)
-data_path = os.path.join(path, "data_file")
-#data reading
-df = pd.read_csv(os.path.join(data_path, 'data_file_name'))
+# path = os.path.dirname(__file__)
+# data_path = os.path.join(path, "data_file")
+# #data reading
+# df = pd.read_csv(os.path.join(data_path, 'data_file_name'))
 
+iris = load_iris()
+X = iris.data          # (150, 4) -> features numériques
+y = iris.target        # (150,)   -> labels 0, 1, 2
+feature_names = iris.feature_names
+target_names = iris.target_names
+
+# Si tu veux un DataFrame complet pour explorer rapidement
+df = pd.DataFrame(X, columns=feature_names)
+df["species"] = pd.Categorical.from_codes(y, target_names)
+
+print(df.head())
+print(df.shape)
 #Might want to clean data (work on categories, filling the blanks, regular data engineering)
 
 #Defining train & test sets
-X, y = df.drop(columns=["Category", "other_cols_if_needed"]), df["Category"]
-X_train, y_train, X_test, y_test = train_test_split(
-    X, y, test_size = to_refine, random_state = seed
+# X, y = df.drop(columns=["Category", "other_cols_if_needed"]), df["Category"]
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size = 0.5, random_state = 42
 )
-
+print(y)
+print(y_train)
 #Fitting one tree
-clf = tree.DecisionTreeClassifier(max_depth=to_refine)
+clf = tree.DecisionTreeClassifier(max_depth=5)
 clf = clf.fit(X_train, y_train)
 
 #Predict over the single tree

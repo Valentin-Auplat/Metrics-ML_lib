@@ -1,54 +1,79 @@
 # ===== Chargement des librairies =====
 library(rpart)          # arbre de décision simple (équivalent tree.DecisionTreeClassifier)
+library(rpart.plot)     # visualisation de l'arbre (équivalent tree.plot_tree)
 library(mlr3)           # framework ML principal (équivalent sklearn)
 library(mlr3learners)   # contient le learner randomForest ("classif.ranger")
 library(mlr3tuning)     # équivalent de RandomizedSearchCV
 library(paradox)        # définition des espaces de paramètres (équivalent param_dist)
 library(caret)          # pour confusionMatrix uniquement (affichage des résultats)
-library(here)           # gestion des chemins
+library(here)           # gestion des chemins (utile seulement si on lit un fichier externe)
 
 # ===== Récupération des données =====
 # source(here("..", "dossier_fichier", "nom_fichier.R"))  # si besoin d'importer des fonctions
+#
+# data_path <- here("data_file")
+# df <- read.csv(file.path(data_path, "data_file_name.csv"))
+#
+# # Nettoyage des données si besoin (catégories, NA, etc.) ici
+#
+# # La cible doit être un facteur pour la classification
+# df$Category <- as.factor(df$Category)
 
-data_path <- here("data_file")
-df <- read.csv(file.path(data_path, "data_file_name.csv"))
+data(iris)  # disponible nativement, aucun package requis
 
-# Nettoyage des données si besoin (catégories, NA, etc.) ici
+X <- as.matrix(iris[, 1:4])      # les 4 variables numériques
+y <- iris$Species                 # facteur à 3 niveaux
 
-# La cible doit être un facteur pour la classification
-df$Category <- as.factor(df$Category)
+head(iris)
+dim(iris)
 
 # ===== Définition des jeux d'entraînement et de test =====
-set.seed(seed)  # équivalent random_state
+set.seed(42)  # équivalent random_state=42, pour la reproductibilité
 
-# On retire les colonnes inutiles, comme X = df.drop(...)
-df_model <- df[, !(names(df) %in% c("other_cols_if_needed"))]
+# p = proportion d'entraînement souhaitée (ici 70%), pas la proportion de test
+train_index <- caret::createDataPartition(y, p = 0.7, list = FALSE)
 
-train_index <- caret::createDataPartition(df_model$Category, p = 1 - to_refine, list = FALSE)
-train_set <- df_model[train_index, ]
-test_set  <- df_model[-train_index, ]
+X_train <- X[train_index, ]
+X_test  <- X[-train_index, ]
+y_train <- y[train_index]
+y_test  <- y[-train_index]
+
+# CORRECTION : rpart() et as_task_classif() ont besoin d'un data.frame
+# contenant à la fois les features ET la colonne cible — pas une matrice
+# de features seule. On reconstruit donc des data.frames complets.
+train_df <- data.frame(X_train, Species = y_train)
+test_df  <- data.frame(X_test,  Species = y_test)
 
 # ===== Fitting d'un arbre unique =====
 # rpart = équivalent direct de DecisionTreeClassifier
 clf <- rpart(
-  Category ~ .,
-  data = train_set,
+  Species ~ .,                                    # CORRECTION : "Species", pas "Category"
+  data = train_df,                                # CORRECTION : data.frame complet, pas X_train
   method = "class",
-  control = rpart.control(maxdepth = to_refine)
+  control = rpart.control(maxdepth = 3)            # CORRECTION : valeur numérique, "to_refine" n'existait pas
 )
 
+# ===== Visualisation de l'arbre (équivalent de sklearn.tree.plot_tree) =====
+rpart.plot(clf,
+           type = 4,            # affiche les étiquettes à chaque noeud (pas seulement les feuilles)
+           extra = 104,         # affiche la classe majoritaire + la proportion de chaque classe (%)
+           box.palette = "auto",  # une couleur par classe, comme les noeuds colorés de plot_tree
+           main = "Arbre de décision - Iris")
+
 # Prédiction sur l'arbre unique
-y_pred <- predict(clf, newdata = test_set, type = "class")
+y_pred <- predict(clf, newdata = test_df, type = "class")  # CORRECTION : test_df, pas X_test
 
 # Affichage des résultats (classification_report + confusion_matrix)
-print(confusionMatrix(y_pred, test_set$Category))
-
+print(confusionMatrix(y_pred, y_test))    # CORRECTION : y_test directement, pas y_test$Category
+# (y_test est un vecteur factoriel, pas un data.frame)
 
 # ===== Passage à la Random Forest avec mlr3 =====
 
 # Création de la tâche de classification (équivalent de X_train, y_train regroupés)
-task_train <- as_task_classif(train_set, target = "Category")
-task_test  <- as_task_classif(test_set, target = "Category")
+# CORRECTION : on passe les data.frames complets (features + cible),
+# et on corrige la faute de frappe "Specices" -> "Species"
+task_train <- as_task_classif(train_df, target = "Species")
+task_test  <- as_task_classif(test_df,  target = "Species")
 
 # Définition du learner Random Forest (ranger est l'implémentation rapide de RF en R)
 learner_rf <- lrn("classif.ranger",
@@ -74,15 +99,19 @@ search_space <- ps(
 # Resampling = validation croisée à 5 folds (équivalent cv=5)
 resampling <- rsmp("cv", folds = 5)
 
-# Métrique = f1_macro (mlr3 utilise classif.fbeta en macro-average)
-measure <- msr("classif.fbeta", average = "macro")
+# Métrique = balanced accuracy (classif.fbeta est binaire uniquement dans mlr3,
+# contrairement à f1_score(average="macro") qui est nativement multiclasse en sklearn ;
+# classif.bacc est l'équivalent le plus proche compatible multiclasse)
+measure <- msr("classif.bacc")
 
 # Instance de tuning : regroupe tâche, learner, resampling, mesure, espace
-instance <- TuningInstanceSingleCrit$new(
+# CORRECTION : ti() est la syntaxe recommandée (remplace TuningInstanceSingleCrit$new(),
+# désormais dépréciée). Attention : "measures" est au pluriel avec ti().
+instance <- ti(
   task         = task_train,
   learner      = learner_rf,
   resampling   = resampling,
-  measure      = measure,
+  measures     = measure,
   search_space = search_space,
   terminator   = trm("evals", n_evals = 20)  # équivalent n_iter=20
 )
@@ -108,6 +137,6 @@ pred <- best_clf$predict(task_test)
 
 # Conversion en facteurs pour confusionMatrix
 y_best_pred <- pred$response
-y_test_vec  <- test_set$Category
+y_test_vec  <- y_test    # CORRECTION : test_set n'existait pas, on réutilise y_test
 
 print(confusionMatrix(y_best_pred, y_test_vec))
