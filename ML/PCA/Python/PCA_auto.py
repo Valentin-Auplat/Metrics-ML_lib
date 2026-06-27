@@ -5,14 +5,34 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'file'))
 
-path = os.path.dirname(os.path.dirname(__file__))
+from sklearn.datasets import load_iris
+# sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'file'))
 
-# === Chargement et preprocessing ===
-df = pd.read_csv(os.path.join(path, "data"))
-X = df.drop(columns=["features"])
-y = df["target"]
+# path = os.path.dirname(os.path.dirname(__file__))
+
+# # === Chargement et preprocessing ===
+# df = pd.read_csv(os.path.join(path, "data"))
+# X = df.drop(columns=["features"])
+# y = df["target"]
+
+
+iris = load_iris()
+X = iris.data          # (150, 4) -> features numériques
+y = iris.target        # (150,)   -> labels 0, 1, 2
+feature_names = iris.feature_names
+target_names = iris.target_names
+
+# Si tu veux un DataFrame complet pour explorer rapidement
+df = pd.DataFrame(X, columns=feature_names)
+df["species"] = pd.Categorical.from_codes(y, target_names)
+
+print(df.head())
+print(df.shape)
+
+X = df.drop(columns=["species"])
+mapping = {"setosa": 0, "versicolor": 1, "virginica": 2}
+y = df["species"].map(mapping)
 
 # === Standardisation (obligatoire avant PCA) ===
 scaler = StandardScaler()
@@ -44,7 +64,7 @@ variance_df = pd.DataFrame({
 
 print("=== Variance expliquée ===")
 print(variance_df)
-variance_df.to_csv(os.path.join(path, "data/PCA_v1/pca_variance_expliquée_v1.csv"), index=False)
+# variance_df.to_csv(os.path.join(path, "data/PCA_v1/pca_variance_expliquée_v1.csv"), index=False)
 
 # === Analyse 2 : loadings (contributions des features originales) ===
 loadings_df = pd.DataFrame(
@@ -55,7 +75,7 @@ loadings_df = pd.DataFrame(
 
 print("\n=== Loadings (contributions des features) ===")
 print(loadings_df.round(3))
-loadings_df.to_csv(os.path.join(path, "data/PCA_v1/pca_loadings_v1.csv"))
+# loadings_df.to_csv(os.path.join(path, "data/PCA_v1/pca_loadings_v1.csv"))
 
 # === Analyse 3 : données projetées dans l'espace PCA ===
 projected_df = X_pca_full.copy()
@@ -63,7 +83,7 @@ projected_df['target'] = y.values
 
 print("\n=== Données projetées (5 premières lignes) ===")
 print(projected_df.head())
-projected_df.to_csv(os.path.join(path, "data/PCA_v1/pca_projected_v1.csv"), index=False)
+# projected_df.to_csv(os.path.join(path, "data/PCA_v1/pca_projected_v1.csv"), index=False)
 
 # === Visualisation 1 : scree plot et variance cumulée ===
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
@@ -83,7 +103,8 @@ axes[1].set_title('Variance cumulée')
 axes[1].legend()
 
 plt.tight_layout()
-plt.savefig(os.path.join(path, "figures/PCA_v1/pca_variance_v1.png"))
+plt.show()
+# plt.savefig(os.path.join(path, "figures/PCA_v1/pca_variance_v1.png"))
 plt.close()
 
 # === Visualisation 2 : projection 2D colorée par survie ===
@@ -94,31 +115,39 @@ y_reset = y.reset_index(drop=True)
 plt.figure(figsize=(10, 7))
 plt.scatter(X_pca_full.loc[y_reset == 0, 'PC1'],
             X_pca_full.loc[y_reset == 0, 'PC2'],
-            alpha=0.5, label='Décédés', c='red')
+            alpha=0.5, label='setosa', c='red')
 plt.scatter(X_pca_full.loc[y_reset == 1, 'PC1'],
             X_pca_full.loc[y_reset == 1, 'PC2'],
-            alpha=0.5, label='Survivants', c='green')
+            alpha=0.5, label='versicolor', c='green')
+plt.scatter(X_pca_full.loc[y_reset == 2, 'PC1'],
+            X_pca_full.loc[y_reset == 2, 'PC2'],
+            alpha=0.5, label='virginica', c='blue')
 plt.xlabel(f'PC1 ({pca_full.explained_variance_ratio_[0]*100:.1f}% var)')
 plt.ylabel(f'PC2 ({pca_full.explained_variance_ratio_[1]*100:.1f}% var)')
 plt.title('Projection sur les 2 premières composantes principales')
 plt.legend()
 plt.tight_layout()
-plt.savefig(os.path.join(path, "figures/PCA_v1/pca_projection_2d_v1.png"))
+plt.show()
+# plt.savefig(os.path.join(path, "figures/PCA_v1/pca_projection_2d_v1.png"))
 plt.close()
 
 plt.figure(figsize=(10, 7))
 plt.scatter(X_pca_full.loc[y_reset == 0, 'PC1'],
-            X_pca_full.loc[y_reset == 0, 'PC3'],
-            alpha=0.5, label='Décédés', c='red')
+            X_pca_full.loc[y_reset == 0, 'PC2'],
+            alpha=0.5, label='setosa', c='red')
 plt.scatter(X_pca_full.loc[y_reset == 1, 'PC1'],
-            X_pca_full.loc[y_reset == 1, 'PC3'],
-            alpha=0.5, label='Survivants', c='green')
+            X_pca_full.loc[y_reset == 1, 'PC2'],
+            alpha=0.5, label='versicolor', c='green')
+plt.scatter(X_pca_full.loc[y_reset == 2, 'PC1'],
+            X_pca_full.loc[y_reset == 2, 'PC2'],
+            alpha=0.5, label='virginica', c='blue')
 plt.xlabel(f'PC1 ({pca_full.explained_variance_ratio_[0]*100:.1f}% var)')
 plt.ylabel(f'PC3 ({pca_full.explained_variance_ratio_[2]*100:.1f}% var)')
 plt.title('Projection sur les composantes principales 1 et 3')
 plt.legend()
 plt.tight_layout()
-plt.savefig(os.path.join(path, "figures/PCA_v1/pca_projection_2d_PC1_PC3_v1.png"))
+plt.show()
+# plt.savefig(os.path.join(path, "figures/PCA_v1/pca_projection_2d_PC1_PC3_v1.png"))
 plt.close()
 
 print("\n=== Fichiers générés ===")
@@ -144,13 +173,19 @@ ax.scatter(
     X_pca_reset.loc[y_reset == 0, 'PC1'],
     X_pca_reset.loc[y_reset == 0, 'PC3'],
     X_pca_reset.loc[y_reset == 0, 'PC2'],  # PC2 sur l'axe z
-    alpha=0.5, label='Décédés', c='red', s=20
+    alpha=0.5, label='setosa', c='red', s=20
 )
 ax.scatter(
     X_pca_reset.loc[y_reset == 1, 'PC1'],
     X_pca_reset.loc[y_reset == 1, 'PC3'],
     X_pca_reset.loc[y_reset == 1, 'PC2'],
-    alpha=0.5, label='Survivants', c='green', s=20
+    alpha=0.5, label='versicolor', c='green', s=20
+)
+ax.scatter(
+    X_pca_reset.loc[y_reset == 2, 'PC1'],
+    X_pca_reset.loc[y_reset == 2, 'PC3'],
+    X_pca_reset.loc[y_reset == 2, 'PC2'],
+    alpha=0.5, label='virginica', c='blue', s=20
 )
 
 ax.set_xlabel(f'PC1 ({pca_full.explained_variance_ratio_[0]*100:.1f}%) — solitude/famille')
@@ -160,7 +195,8 @@ ax.set_title('Projection 3D — PC1, PC2, PC3')
 ax.legend()
 
 plt.tight_layout()
-plt.savefig(os.path.join(path, "figures/PCA_v1/pca_projection_3d_v1.png"), dpi=150)
+plt.show()
+# plt.savefig(os.path.join(path, "figures/PCA_v1/pca_projection_3d_v1.png"), dpi=150)
 plt.close()
 
 
@@ -168,13 +204,13 @@ import plotly.express as px
 
 # Préparer un DataFrame combiné pour plotly
 plot_df = X_pca_reset[['PC1', 'PC2', 'PC3']].copy()
-plot_df['Survived'] = y_reset.map({0: 'Décédé', 1: 'Survivant'})
+plot_df['species'] = y_reset.map({0: 'setosa', 1: 'versicolor', 2: 'virginica'})
 
 fig = px.scatter_3d(
     plot_df, 
     x='PC1', y='PC3', z='PC2',
-    color='Survived',
-    color_discrete_map={'Décédé': 'red', 'Survivant': 'green'},
+    color='species',
+    color_discrete_map={'setosa': 'red', 'versicolor': 'green', 'virginica': "blue"},
     opacity=0.6,
     title='Projection PCA 3D — Titanic',
     labels={
@@ -184,6 +220,6 @@ fig = px.scatter_3d(
     }
 )
 fig.update_traces(marker=dict(size=4))
-fig.write_html(os.path.join(path, "figures/PCA_v1/pca_projection_3d_v1.html"))
-# fig.show()  # ouvre dans le navigateur
+# fig.write_html(os.path.join(path, "figures/PCA_v1/pca_projection_3d_v1.html"))
+fig.show()  # ouvre dans le navigateur
 
